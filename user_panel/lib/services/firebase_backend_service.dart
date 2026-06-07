@@ -59,6 +59,16 @@ class FirebaseBackendService {
     await user.updatePassword(newPassword);
   }
 
+  Future<void> updateEmail(String email) async {
+    final user = _auth.currentUser;
+    if (user == null) throw Exception('User belum login');
+    await user.verifyBeforeUpdateEmail(email);
+    await _firestore.collection('users').doc(user.uid).set({
+      'email': email,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   Future<void> refreshToken() async {
     await _auth.currentUser?.getIdToken(true);
   }

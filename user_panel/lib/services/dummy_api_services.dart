@@ -31,6 +31,19 @@ class DummyApiService {
             'https://images.unsplash.com/photo-1497366754035-f200968a6e72?w=800',
         assignedTo: 'petugas1',
       ),
+      FieldTask(
+        id: 'T-003',
+        title: 'Dokumentasi Tugas Umum Bulanan',
+        description: 'Upload bukti penyelesaian tugas umum untuk perhitungan tambahan gaji.',
+        status: TaskStatus.selesai,
+        startAt: now.subtract(const Duration(days: 1, hours: 3)),
+        dueAt: now.add(const Duration(days: 1)),
+        latitude: -2.9761,
+        longitude: 104.7754,
+        imageUrl:
+            'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800',
+        assignedTo: 'petugas1',
+      ),
     ];
   }
 }
