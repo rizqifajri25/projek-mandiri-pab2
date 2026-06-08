@@ -1,4 +1,4 @@
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +9,6 @@ import 'package:image_picker/image_picker.dart';
 import '../models/task_models.dart';
 import '../providers/app_providers.dart';
 import '../utils/helpers.dart';
-import 'package:flutter/foundation.dart';
 
 class VerificationScreen extends ConsumerStatefulWidget {
   final FieldTask task;
@@ -25,46 +24,37 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   final notes = TextEditingController();
 
   Future<void> _takePhoto() async {
-  final picked = await ImagePicker().pickImage(
-    source: ImageSource.camera,
-    imageQuality: 70,
-  );
-
-  if (picked == null) return;
-
-  if (!kIsWeb) {
-    final target = '${picked.path}_compressed.jpg';
-
-    final compressed =
-        await FlutterImageCompress.compressAndGetFile(
-      picked.path,
-      target,
-      quality: 65,
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      imageQuality: 70,
     );
 
-    setState(() {
-      photo = XFile(compressed!.path);
-    });
-  } else {
-    setState(() {
-      photo = picked;
-    });
+    if (picked == null) return;
+
+    if (!kIsWeb) {
+      final target = '${picked.path}_compressed.jpg';
+
+      final compressed = await FlutterImageCompress.compressAndGetFile(
+        picked.path,
+        target,
+        quality: 65,
+      );
+
+      setState(() {
+        photo = XFile(compressed!.path);
+      });
+    } else {
+      setState(() {
+        photo = picked;
+      });
+    }
   }
-}
 
   Future<void> _getLoc() async {
     await Geolocator.requestPermission();
 
-    Position position =
-        await Geolocator.getCurrentPosition();
-
+    final position = await Geolocator.getCurrentPosition();
     pos = position;
-
-    LatLng currentLocation = LatLng(
-      position.latitude,
-      position.longitude,
-    );
-
     setState(() {});
   }
 
@@ -76,7 +66,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
           children: [
             Text('Timestamp: ${DateTime.now()}'),
             const SizedBox(height: 8),
-            ElevatedButton(onPressed: _takePhoto, child: Text(photo == null ? 'Ambil & kompres foto' : 'Ganti foto')),
+            ElevatedButton(
+              onPressed: _takePhoto,
+              child: Text(photo == null ? 'Ambil & kompres foto' : 'Ganti foto'),
+            ),
             if (photo != null)
               Image.network(
                 photo!.path,
@@ -84,7 +77,10 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                 fit: BoxFit.cover,
               ),
             const SizedBox(height: 8),
-            ElevatedButton(onPressed: _getLoc, child: Text(pos == null ? 'Ambil lokasi realtime' : 'Update lokasi')),
+            ElevatedButton(
+              onPressed: _getLoc,
+              child: Text(pos == null ? 'Ambil lokasi realtime' : 'Update lokasi'),
+            ),
             if (pos != null) ...[
               Text('Lat: ${pos!.latitude}, Lng: ${pos!.longitude}'),
               SizedBox(
@@ -93,10 +89,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   height: 300,
                   child: FlutterMap(
                     options: MapOptions(
-                      initialCenter: LatLng(
-                          pos!.latitude,
-                          pos!.longitude,
-                        ),
+                      initialCenter: LatLng(pos!.latitude, pos!.longitude),
                       initialZoom: 15,
                     ),
                     children: [
@@ -105,7 +98,6 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                             'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.example.app',
                       ),
-
                       MarkerLayer(
                         markers: [
                           Marker(
@@ -115,19 +107,22 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                             ),
                             width: 80,
                             height: 80,
-                            child: Icon(Icons.location_pin, size: 40),
+                            child: const Icon(Icons.location_pin, size: 40),
                           ),
                         ],
                       ),
                     ],
                   ),
-                )
+                ),
               ),
             ],
-            TextField(controller: notes, decoration: const InputDecoration(labelText: 'Catatan verifikasi')),
+            TextField(
+              controller: notes,
+              decoration: const InputDecoration(labelText: 'Catatan verifikasi'),
+            ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final done = DateTime.now();
                 final record = VerificationRecord(
                   id: done.millisecondsSinceEpoch.toString(),
@@ -140,11 +135,18 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   longitude: pos?.longitude ?? widget.task.longitude,
                   notes: '${notes.text} | watermark:$done',
                 );
-                ref.read(verificationHistoryProvider.notifier).state = [
-                  ...ref.read(verificationHistoryProvider),
-                  record
-                ];
-                SnackbarHelper.show(context, 'Verifikasi tersimpan. Queue offline akan retry saat online.');
+                await ref.read(firebaseBackendProvider).submitVerification(
+                      task: widget.task,
+                      record: record,
+                    );
+                ref.invalidate(taskListProvider);
+                ref.invalidate(verificationHistoryProvider);
+                if (!context.mounted) return;
+                SnackbarHelper.show(
+                  context,
+                  'Verifikasi tersimpan ke Firestore dan menunggu validasi '
+                  'admin.',
+                );
                 Navigator.pop(context);
               },
               child: const Text('Submit Verifikasi'),

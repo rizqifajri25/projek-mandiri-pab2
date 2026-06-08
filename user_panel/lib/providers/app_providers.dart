@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/task_models.dart';
 import '../repositories/task_repository.dart';
-import '../services/dummy_api_services.dart';
 import '../services/firebase_backend_service.dart';
 
 class UserProfile {
@@ -38,22 +37,21 @@ final userProfileProvider = StateProvider<UserProfile>((ref) {
   return UserProfile(name: username, email: email, photoPath: null);
 });
 
-final apiProvider = Provider((ref) => DummyApiService());
 final taskRepositoryProvider =
-    Provider((ref) => TaskRepository(ref.read(apiProvider)));
+    Provider((ref) => TaskRepository(ref.read(firebaseBackendProvider)));
 
 final authTokenProvider = StateProvider<String?>((ref) => null);
 final darkModeProvider = StateProvider<bool>((ref) => false);
 final taskStatusFilterProvider = StateProvider<TaskStatus?>((ref) => null);
-final verificationHistoryProvider =
-    StateProvider<List<VerificationRecord>>((ref) => []);
 
-final adminMessagesProvider = StateProvider<List<String>>((ref) => [
-      'Admin: Mohon upload bukti lebih jelas untuk tugas T-001.',
-      'Admin: Tugas umum kebersihan lapangan telah ditambahkan.',
-      'Admin: Bonus gaji akhir bulan akan mengikuti tugas umum yang disetujui.',
-    ]);
+final verificationHistoryProvider = StreamProvider<List<VerificationRecord>>(
+  (ref) => ref.watch(firebaseBackendProvider).streamVerificationHistory(),
+);
 
-final taskListProvider = FutureProvider<List<FieldTask>>((ref) async {
-  return ref.read(taskRepositoryProvider).getTasks();
+final adminMessagesProvider = StreamProvider<List<String>>(
+  (ref) => ref.watch(firebaseBackendProvider).streamAdminMessages(),
+);
+
+final taskListProvider = StreamProvider<List<FieldTask>>((ref) {
+  return ref.read(taskRepositoryProvider).watchTasks();
 });

@@ -10,7 +10,7 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tasks = ref.watch(taskListProvider).value ?? [];
-    final messages = ref.watch(adminMessagesProvider);
+    final messages = ref.watch(adminMessagesProvider).value ?? [];
     final profile = ref.watch(userProfileProvider);
 
     int count(TaskStatus s) => tasks.where((e) => e.status == s).length;
