@@ -70,12 +70,21 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
               onPressed: _takePhoto,
               child: Text(photo == null ? 'Ambil & kompres foto' : 'Ganti foto'),
             ),
-            if (photo != null)
-              Image.network(
-                photo!.path,
-                height: 160,
-                fit: BoxFit.cover,
-              ),
+           if (photo != null)
+            FutureBuilder(
+              future: photo!.readAsBytes(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const CircularProgressIndicator();
+                }
+
+                return Image.memory(
+                  snapshot.data!,
+                  height: 160,
+                  fit: BoxFit.cover,
+                );
+              },
+            ),
             const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _getLoc,

@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -79,6 +83,7 @@ class AdminTask {
     this.assignedToEmail,
     required this.salaryBonus,
     required this.isGeneral,
+    required this.imageUrl,
     this.status = 'pending',
   });
 
@@ -91,6 +96,7 @@ class AdminTask {
   int salaryBonus;
   bool isGeneral;
   String status;
+  String imageUrl;
 
   factory AdminTask.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -104,6 +110,7 @@ class AdminTask {
       salaryBonus: (data['salaryBonus'] as num?)?.toInt() ?? 0,
       isGeneral: data['isGeneral'] == true,
       status: data['status'] ?? 'pending',
+      imageUrl: data['imageUrl'] ?? '',
     );
   }
 }
@@ -184,6 +191,45 @@ class AdminFirebaseService {
     });
   }
 
+  Future<String> uploadTaskImage(XFile image) async {
+    final bytes = await image.readAsBytes();
+
+    final uri = Uri.parse(
+      'https://api.cloudinary.com/v1_1/dcfy2ljrl/image/upload',
+    );
+
+    final request = http.MultipartRequest(
+      'POST',
+      uri,
+    );
+
+    request.fields['upload_preset'] = 'mandiri';
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: image.name,
+      ),
+    );
+
+    final response = await request.send();
+
+    final responseData =
+        await response.stream.bytesToString();
+
+    final jsonData =
+        jsonDecode(responseData);
+
+    if (response.statusCode == 200) {
+      return jsonData['secure_url'];
+    }
+
+    throw Exception(
+      'Upload gagal: $responseData',
+    );
+  }
+
   Future<void> login(String email, String password) {
     return _auth.signInWithEmailAndPassword(email: email, password: password);
   }
@@ -241,9 +287,10 @@ class AdminFirebaseService {
     required AdminUser? assignedUser,
     required bool isGeneral,
     required int salaryBonus,
+    required String imageUrl,
   }) async {
     final now = DateTime.now();
-    await _db.collection('tasks').add({
+     await _db.collection('tasks').add({
       'title': title,
       'description': description,
       'assignedTo': isGeneral ? 'Semua user' : assignedUser?.name,
@@ -252,11 +299,11 @@ class AdminFirebaseService {
       'isGeneral': isGeneral,
       'salaryBonus': salaryBonus,
       'status': 'pending',
+      'imageUrl': imageUrl,
       'startAt': Timestamp.fromDate(now),
-      'dueAt': Timestamp.fromDate(now.add(const Duration(days: 1))),
-      'latitude': 0,
-      'longitude': 0,
-      'imageUrl': '',
+      'dueAt': Timestamp.fromDate(
+        now.add(const Duration(days: 1)),
+      ),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -453,7 +500,10 @@ class _DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pending = verifications.where((v) => v.state == VerificationState.menunggu).length;
-    final bonus = tasks.fold<int>(0, (sum, task) => sum + task.salaryBonus);
+    final bonus = tasks.fold<int>(
+      0,
+      (total, task) => total + task.salaryBonus,
+    );
     return _AdminScaffold(
       title: 'Dashboard Realtime',
       child: ListView(
@@ -584,6 +634,8 @@ class _TasksPage extends StatelessWidget {
     final title = TextEditingController();
     final description = TextEditingController();
     final bonus = TextEditingController(text: '0');
+    final picker = ImagePicker();
+    XFile? selectedImage;
     AdminUser? assigned = users.isEmpty ? null : users.first;
     bool isGeneral = false;
     final ok = await showDialog<bool>(
@@ -611,7 +663,50 @@ class _TasksPage extends StatelessWidget {
               TextField(controller: bonus, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Tambahan gaji akhir bulan')),
             ],
           ),
+
           actions: [
+            const SizedBox(height: 12),
+
+            OutlinedButton.icon(
+              onPressed: () async {
+                final image = await picker.pickImage(
+                  source: ImageSource.gallery,
+                );
+
+                if (image != null) {
+                  setDialogState(() {
+                    selectedImage = image;
+                  });
+                }
+              },
+              icon: const Icon(Icons.image),
+              label: Text(
+                selectedImage == null
+                    ? 'Pilih Gambar'
+                    : 'Gambar Dipilih',
+              ),
+            ),
+
+            if (selectedImage != null)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  '✓ Gambar berhasil dipilih',
+                  style: TextStyle(color: Colors.green),
+                ),
+              ),
+
+              if (selectedImage != null)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: 12,
+                  ),
+                  child: Image.network(
+                    selectedImage!.path,
+                    height: 120,
+                  ),
+                ),
+
             TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Batal')),
             FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Simpan')),
           ],
@@ -619,13 +714,38 @@ class _TasksPage extends StatelessWidget {
       ),
     );
     if (ok != true) return;
-    await adminService.addTask(
-      title: title.text.trim(),
-      description: description.text.trim(),
-      assignedUser: assigned,
-      isGeneral: isGeneral,
-      salaryBonus: int.tryParse(bonus.text) ?? 0,
+    if (selectedImage == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Pilih gambar terlebih dahulu'),
+      ),
     );
+    return;
+  }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    final imageUrl =
+        await adminService.uploadTaskImage(
+      selectedImage!,
+    );
+
+    Navigator.pop(context);
+
+  await adminService.addTask(
+    title: title.text.trim(),
+    description: description.text.trim(),
+    assignedUser: assigned,
+    isGeneral: isGeneral,
+    salaryBonus: int.tryParse(bonus.text) ?? 0,
+    imageUrl: imageUrl,
+  );
     await adminService.sendNotification('Admin menambahkan ${isGeneral ? 'tugas umum' : 'tugas'} ${title.text} untuk ${isGeneral ? 'semua user' : assigned?.name}.', targetUserId: isGeneral ? null : assigned?.id);
   }
 
@@ -642,7 +762,19 @@ class _TasksPage extends StatelessWidget {
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
               child: ListTile(
-                leading: CircleAvatar(backgroundColor: task.isGeneral ? Colors.green.shade100 : Colors.indigo.shade100, child: Icon(task.isGeneral ? Icons.public : Icons.assignment_ind)),
+                leading: task.imageUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        task.imageUrl,
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const Icon(Icons.broken_image),
+                      ),
+                    )
+                  : const Icon(Icons.image),
                 title: Text(task.title, style: const TextStyle(fontWeight: FontWeight.w900)),
                 subtitle: Text('${task.assignedTo} • ${task.status.toUpperCase()} • Bonus Rp${task.salaryBonus}\n${task.description}'),
                 isThreeLine: true,
