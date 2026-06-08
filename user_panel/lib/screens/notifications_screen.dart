@@ -7,7 +7,7 @@ class NotificationsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final messages = ref.watch(adminMessagesProvider);
+    final messages = ref.watch(adminMessagesProvider).value ?? [];
 
     return Scaffold(
       appBar: AppBar(title: const Text('Notifikasi Admin')),

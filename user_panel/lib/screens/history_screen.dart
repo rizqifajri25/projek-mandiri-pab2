@@ -8,7 +8,7 @@ class HistoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final history = ref.watch(verificationHistoryProvider);
+    final history = ref.watch(verificationHistoryProvider).value ?? [];
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
 
     return Scaffold(

@@ -1,9 +1,10 @@
 import '../models/task_models.dart';
-import '../services/dummy_api_services.dart';
+import '../services/firebase_backend_service.dart';
 
 class TaskRepository {
-  TaskRepository(this._api);
-  final DummyApiService _api;
+  TaskRepository(this._backend);
+  final FirebaseBackendService _backend;
 
-  Future<List<FieldTask>> getTasks() => _api.fetchTasks();
+  Future<List<FieldTask>> getTasks() => _backend.fetchTasks();
+  Stream<List<FieldTask>> watchTasks() => _backend.streamTasks();
 }
