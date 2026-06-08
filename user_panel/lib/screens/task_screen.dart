@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:projek_tugas_mandiri/models/task_models.dart' show TaskStatus;
 import '../providers/app_providers.dart';
 import '../widgets/common_widgets.dart';
 import 'verification_screen.dart';
@@ -77,7 +78,9 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                           padding: const EdgeInsets.only(bottom: 10),
                           child: InputChip(
                             avatar: const Icon(Icons.filter_alt, size: 18),
-                            label: Text('Filter: ${selectedStatus.name.toUpperCase()}'),
+                            label: Text(
+                              'Filter: ${taskStatusText(selectedStatus).toUpperCase()}',
+                            ),
                             onDeleted: () => ref.read(taskStatusFilterProvider.notifier).state = null,
                           ),
                         );
@@ -104,7 +107,7 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
                                 subtitle: Text(t.description),
                                 trailing: Chip(
                                   backgroundColor: _statusColor(t.status).withValues(alpha: .14),
-                                  label: Text(t.status.name.toUpperCase(), style: TextStyle(color: _statusColor(t.status), fontWeight: FontWeight.w800)),
+                                  label: Text(taskStatusText(t.status), style: TextStyle(color: _statusColor(t.status), fontWeight: FontWeight.w800)),
                                 ),
                               ),
                               Padding(
@@ -135,13 +138,24 @@ class _TasksScreenState extends ConsumerState<TasksScreen> {
   }
 }
 
-Color _statusColor(dynamic status) {
-  switch (status.name) {
-    case 'pending':
+String taskStatusText(TaskStatus status) {
+  switch (status) {
+    case TaskStatus.pending:
+      return 'pending';
+    case TaskStatus.diproses:
+      return 'diproses';
+    case TaskStatus.selesai:
+      return 'selesai';
+  }
+}
+
+Color _statusColor(TaskStatus status) {
+  switch (status) {
+    case TaskStatus.pending:
       return Colors.orange;
-    case 'diproses':
+    case TaskStatus.diproses:
       return Colors.blue;
-    default:
+    case TaskStatus.selesai:
       return Colors.green;
   }
 }
